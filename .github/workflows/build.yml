@@ -1,0 +1,38 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build with Windows .NET Framework
+        shell: pwsh
+        run: ./build.ps1
+      - name: Run hardware-independent tests
+        shell: pwsh
+        run: ./test.ps1
+      - name: Package executable and installer
+        shell: pwsh
+        run: ./package.ps1
+      - name: Upload Windows package and test report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: L14KeyboardLight-windows-x64
+          path: |
+            dist/*.zip
+            dist/*.sha256
+            reports/self-test.txt
+          if-no-files-found: error
+          retention-days: 14
