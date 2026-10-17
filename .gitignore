@@ -1,0 +1,28 @@
+# Generated builds and local release packages
+/bin/
+/release/
+/dist/
+*.zip
+*.exe
+*.pdb
+
+# Private machine state and diagnostics
+/legacy-backup/
+*-status.txt
+/install-preflight.txt
+/status.txt
+/.github-proof/
+*-result.txt
+/self-test.txt
+/live-test.txt
+*.log
+*.log.old
+/reports/
+
+# Editors and operating system
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini
