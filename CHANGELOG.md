@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 — 2026-10-17
+
+- Fix the keyboard backlight remaining on when Windows reports the display off, including while the session is locked.
+- Apply display-off suppression immediately and recheck approximately every two seconds while the app can run. A dimmed display still counts as on.
+- Keep display-off suppression active independently of the fullscreen checkbox and fullscreen manual overrides; pausing or exiting while the display is off does not relight the keyboard.
+- Restore the remembered brightness after the display and session become active and the resume delay has elapsed, while preserving fullscreen suppression and manual overrides where applicable.
+- Preserve restoration state across firmware defaults and failed device reads or writes without saving temporary Off as the preferred brightness.
+- Add 19 display-off policy tests and 16 power-notification tests, bringing the automated suite to 102 passing tests.
+
 ## 1.1.0 — 2026-10-17
 
 - Add English and Hungarian tray menus, status dialogs, tooltips and app messages.

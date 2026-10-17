@@ -19,6 +19,7 @@ namespace L14KeyboardLight
         private bool pendingOffWrite;
         private bool resumePending;
         private bool preferenceSavePending;
+        private bool displayRestorePending;
 
         public BacklightPolicy(IBacklightDevice device, int preferredLevel,
             bool autoEnabled, Action<int> savePreferred)
@@ -39,6 +40,24 @@ namespace L14KeyboardLight
         public bool IsSuppressed { get; private set; }
         public bool IsFullscreen { get; private set; }
         public bool ManualOverride { get; private set; }
+        public bool IsDisplayOff { get; private set; }
+
+        public void SuppressForDisplayOff()
+        {
+            // This notification can arrive after firmware has already changed
+            // the light. Use the remembered preference, never that temporary
+            // hardware value, when establishing restoration ownership.
+            IsDisplayOff = true;
+            displayRestorePending = true;
+            resumePending = true;
+            if (!hasRestoreSnapshot)
+            {
+                restoreLevel = PreferredLevel;
+                hasRestoreSnapshot = true;
+            }
+            pendingOffWrite = true;
+            CompleteSuppression(ReadCurrent());
+        }
 
         public void Poll(bool fullscreen, bool active, bool resuming)
         {
@@ -52,12 +71,29 @@ namespace L14KeyboardLight
 
             if (resuming)
                 resumePending = true;
+            IsDisplayOff = false;
             IsFullscreen = fullscreen;
             if (!fullscreen)
                 ManualOverride = false;
 
             int current = ReadCurrent();
             bool shouldSuppress = AutoEnabled && fullscreen && !ManualOverride;
+
+            if (displayRestorePending && hasRestoreSnapshot)
+            {
+                // Firmware wake defaults are not manual choices. Keep the
+                // pending flag until the write succeeds so retries cannot
+                // adopt such a default or discard the remembered level.
+                if (shouldSuppress)
+                {
+                    CompleteSuppression(current);
+                    displayRestorePending = false;
+                }
+                else
+                    RestoreAfterDisplayOff(current);
+                resumePending = false;
+                return;
+            }
 
             if (hasRestoreSnapshot)
             {
@@ -125,6 +161,18 @@ namespace L14KeyboardLight
         public void ChooseLevel(int level)
         {
             ValidateLevel(level);
+            if (IsDisplayOff)
+            {
+                // An explicit desired level can change while the screen is
+                // off, but applying it must wait until the active desktop.
+                restoreLevel = level;
+                hasRestoreSnapshot = true;
+                displayRestorePending = true;
+                resumePending = true;
+                ManualOverride = AutoEnabled && IsFullscreen;
+                RememberPreference(level);
+                return;
+            }
             // Do not release restoration ownership until the explicit choice
             // has been applied successfully.
             WriteCurrent(level);
@@ -139,15 +187,25 @@ namespace L14KeyboardLight
             if (enabled && !AutoEnabled)
                 ManualOverride = false;
             AutoEnabled = enabled;
-            if (!enabled && hasRestoreSnapshot)
-                RestoreSnapshot(ReadCurrent());
+            if (!enabled && hasRestoreSnapshot && !IsDisplayOff)
+            {
+                if (displayRestorePending)
+                    RestoreAfterDisplayOff(ReadCurrent());
+                else
+                    RestoreSnapshot(ReadCurrent());
+            }
         }
 
         public void Shutdown()
         {
             AutoEnabled = false;
-            if (hasRestoreSnapshot)
-                RestoreSnapshot(ReadCurrent());
+            if (hasRestoreSnapshot && !IsDisplayOff)
+            {
+                if (displayRestorePending)
+                    RestoreAfterDisplayOff(ReadCurrent());
+                else
+                    RestoreSnapshot(ReadCurrent());
+            }
         }
 
         private void BeginSuppression(int snapshot, int current)
@@ -187,10 +245,19 @@ namespace L14KeyboardLight
             ClearSnapshot();
         }
 
+        private void RestoreAfterDisplayOff(int current)
+        {
+            if (current != restoreLevel)
+                WriteCurrent(restoreLevel);
+            ClearSnapshot();
+            displayRestorePending = false;
+        }
+
         private void ClearSnapshot()
         {
             hasRestoreSnapshot = false;
             pendingOffWrite = false;
+            displayRestorePending = false;
             IsSuppressed = false;
         }
 

@@ -11,8 +11,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("L14 Keyboard Light")]
 [assembly: AssemblyDescription("Lenovo OEM driver keyboard backlight control for ThinkPad L14 Gen 3 21C2")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
 
 namespace L14KeyboardLight
 {
@@ -42,7 +42,9 @@ namespace L14KeyboardLight
                         int policy = PolicyTests.Run(output);
                         int fullscreen = FullscreenTests.Run(output);
                         int localization = LocalizationTests.Run(output);
-                        bool passed = policy == 0 && fullscreen == 0 && localization == 0;
+                        int display = DisplayOffTests.Run(output);
+                        int notifications = DisplayNotificationTests.Run(output);
+                        bool passed = policy == 0 && fullscreen == 0 && localization == 0 && display == 0 && notifications == 0;
                         output.WriteLine("OVERALL: " + (passed ? "PASS" : "FAIL"));
                         return passed ? 0 : 1;
                     }
@@ -106,6 +108,8 @@ namespace L14KeyboardLight
         private bool resumePending;
         private DateTime settleUntil = DateTime.MinValue;
         private DateTime retryAfter = DateTime.MinValue;
+        private DateTime nextDisplayOffCheck = DateTime.MinValue;
+        private bool displayOffApplied;
         private Exception lastError;
         private string lastShownError;
         private string lastState;
@@ -128,8 +132,6 @@ namespace L14KeyboardLight
             });
             power = new PowerWindow();
             wasActive = power.IsActive;
-            power.Resuming += delegate { resumePending = true; settleUntil = DateTime.UtcNow.AddMilliseconds(1400); };
-            power.SessionEnding += delegate { ExitThread(); };
             menu = new ContextMenuStrip();
             ToolStripMenuItem title = new ToolStripMenuItem("L14 Keyboard Light");
             title.Enabled = false;
@@ -191,15 +193,35 @@ namespace L14KeyboardLight
             tray.DoubleClick += delegate { status.PerformClick(); };
             timer = new System.Windows.Forms.Timer { Interval = 350 };
             timer.Tick += Tick;
+            // Install handlers after every field used by callbacks is ready.
+            power.Resuming += delegate
+            {
+                resumePending = true;
+                settleUntil = DateTime.UtcNow.AddMilliseconds(1400);
+                retryAfter = DateTime.MinValue;
+                nextDisplayOffCheck = DateTime.MinValue;
+                if (!power.DisplayOn) TrySuppressForDisplayOff();
+            };
+            power.DisplayStateChanged += delegate
+            {
+                Settings.Log("Display state: " + (power.DisplayOn ? "on" : "off"));
+                nextDisplayOffCheck = DateTime.MinValue;
+                if (power.DisplayOn) displayOffApplied = false;
+                else TrySuppressForDisplayOff();
+            };
+            power.SessionEnding += delegate { ExitThread(); };
             timer.Start();
             Application.ApplicationExit += ApplicationExiting;
-            Settings.Log("Started 1.1.0; model=" + device.Model + "; initial=" + initial + "; preferred=" + policy.PreferredLevel + "; language=" + UiText.Language);
+            Settings.Log("Started 1.1.1; model=" + device.Model + "; initial=" + initial + "; preferred=" + policy.PreferredLevel + "; language=" + UiText.Language);
             UpdateMenu();
         }
 
         private void Tick(object sender, EventArgs e)
         {
             if (stopEvent.WaitOne(0)) { ExitThread(); return; }
+            // A screen-off event is separate from sleep/lock: turn the light off
+            // while the driver is still available, even when fullscreen is paused.
+            if (!power.DisplayOn) TrySuppressForDisplayOff();
             bool active = power.IsActive;
             if (active && !wasActive) { resumePending = true; settleUntil = DateTime.UtcNow.AddMilliseconds(1400); }
             wasActive = active;
@@ -211,8 +233,10 @@ namespace L14KeyboardLight
             if (DateTime.UtcNow < retryAfter) return;
             try
             {
+                bool wakingDisplay = policy.IsDisplayOff;
                 policy.Poll(FullscreenDetector.IsForegroundFullscreen(), true, resumePending);
                 resumePending = false;
+                if (wakingDisplay) Settings.Log("Display on: keyboard level=" + policy.LastObservedLevel + "; fullscreen=" + policy.IsFullscreen);
                 lastError = null;
                 lastShownError = null;
                 string state = "fullscreen=" + policy.IsFullscreen + "; suppressed=" + policy.IsSuppressed +
@@ -221,6 +245,28 @@ namespace L14KeyboardLight
                 UpdateTooltip();
             }
             catch (Exception error) { ReportError(error); }
+        }
+
+        private void TrySuppressForDisplayOff()
+        {
+            if (exiting || power.DisplayOn || !power.CanControlBacklight || DateTime.UtcNow < nextDisplayOffCheck) return;
+            try
+            {
+                policy.SuppressForDisplayOff();
+                // Recheck gently while awake so Fn+Space cannot leave the light on
+                // behind a powered-off display. Modern Standby can suspend timers.
+                nextDisplayOffCheck = DateTime.UtcNow.AddSeconds(2);
+                if (!displayOffApplied) Settings.Log("Display off: keyboard off; preferred=" + policy.PreferredLevel);
+                displayOffApplied = true;
+                lastError = null;
+                lastShownError = null;
+                UpdateTooltip();
+            }
+            catch (Exception error)
+            {
+                nextDisplayOffCheck = DateTime.UtcNow.AddSeconds(5);
+                ReportError(error);
+            }
         }
 
         private void Act(Action action)
@@ -241,13 +287,16 @@ namespace L14KeyboardLight
         {
             retryAfter = DateTime.UtcNow.AddSeconds(5);
             string message = UiText.ErrorMessage(error);
-            if (message != lastShownError)
+            if (lastError == null || UiText.ErrorMessage(lastError) != message)
             {
                 Settings.Log(error.ToString());
+            }
+            if (message != lastShownError && power.IsActive)
+            {
                 tray.ShowBalloonTip(7000, "L14 Keyboard Light", message, ToolTipIcon.Warning);
+                lastShownError = message;
             }
             lastError = error;
-            lastShownError = message;
             UpdateTooltip();
         }
 

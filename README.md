@@ -1,6 +1,6 @@
 # L14 Keyboard Light
 
-A small Windows tray app that turns off a ThinkPad's keyboard backlight while the foreground window is fullscreen, then restores its previous brightness.
+A small Windows tray app that turns off a ThinkPad's keyboard backlight while the display is off or the foreground window is fullscreen, then restores its previous brightness.
 
 **Supported hardware: ThinkPad L14 Gen 3 Intel, machine type 21C2, with a backlit keyboard and Lenovo's existing power-management driver.** This release deliberately rejects other model types and unexpected driver responses. It has been tested on one 21C2 laptop running Windows 11.
 
@@ -11,9 +11,10 @@ A small Windows tray app that turns off a ThinkPad's keyboard backlight while th
 - Off, Low and High brightness from the tray menu.
 - English and Hungarian menus, status dialogs, tooltips and app messages, with live language switching.
 - Automatic fullscreen suppression and restoration of the previous level.
+- Automatic suppression when Windows reports the display off, including while locked; dimming alone does not trigger it.
 - Manual overrides with **Fn+Space** or the tray menu. An override lasts for the current fullscreen session.
 - Optional startup with the current Windows account.
-- Handling for lock, display-off and resume notifications, with simulated tests for those state transitions.
+- Handling for lock, display-off and resume notifications, preserving the remembered brightness across firmware resets.
 - No network access, telemetry or automatic updater.
 
 The app uses the **already installed Lenovo `IBMPmDrv` driver**. It does not install a kernel driver or include WinRing0, TVicPort or PawnIO. Lenovo Vantage and a separate .NET Desktop Runtime are not required. The app runs as a normal user.
@@ -85,9 +86,11 @@ Right-click the keyboard icon near the clock. It may be in the hidden-icons area
 | **Start with Windows** | **Indítás a Windowszal** | Enable or disable startup for your Windows account. |
 | **Language → English / Magyar** | **Nyelv → English / Magyar** | Change the interface language immediately and remember it for the next launch. |
 | **Status…** | **Állapot…** | Show the model, current policy state and last error. Double-clicking the icon also opens this dialog. |
-| **Exit** | **Kilépés** | Exit and restore brightness if this app still owns the automatic suppression. |
+| **Exit** | **Kilépés** | Exit and restore brightness if the display and session are active and this app still owns the automatic suppression. |
 
-Turning off automation or exiting restores a light the app suppressed, without overwriting a manual brightness change. A new fullscreen session enables suppression again after a manual override.
+Pausing fullscreen automation or exiting restores a light the app suppressed while the display and session are active, without overwriting a manual brightness change. A new fullscreen session enables suppression again after a manual override.
+
+Display-off suppression is always enabled, independently of the fullscreen checkbox and fullscreen manual overrides. When Windows reports the display off, the app switches the keyboard light off immediately and rechecks approximately every two seconds while Windows allows it to run. It restores the remembered level once the display and session are active again, unless fullscreen automation should keep it off. Pausing automation or exiting while the display is off does not relight the keyboard.
 
 ## Fullscreen detection and limitations
 
@@ -95,7 +98,7 @@ Every approximately 350 ms, the app compares the foreground window with the full
 
 This is a **window-size heuristic**, not video-playback detection. A paused fullscreen video still counts as fullscreen. A borderless window manually sized to fill a monitor may also count. Exclusive fullscreen games and multiple physical monitors have not been tested locally.
 
-While Windows reports the session inactive, the app avoids treating a firmware-induced Off state as a new brightness preference. On return it waits briefly, then reevaluates fullscreen state and restores the remembered level when appropriate. Actual locking, display-off and sleep cycles were not induced during local validation; their policy behavior is covered by simulated tests.
+While Windows reports the session inactive, the app avoids treating a firmware-induced Off state as a new brightness preference. On return it waits approximately 1.4 seconds, then reevaluates fullscreen state and restores the remembered level when appropriate. A display-on notification alone does not restore the light while the session remains locked or suspended. Notification handling and these state transitions are covered by automated tests.
 
 ## Settings and diagnostics
 
@@ -106,7 +109,7 @@ The saved language is `en` or `hu` in `settings.json`. Existing 1.0.0 settings r
 The following commands do not start a second tray controller:
 
 ```powershell
-# Run 20 policy, 30 fullscreen-geometry and 17 localization tests; no hardware writes.
+# Run all 102 policy, display-off, power-notification, geometry and localization tests; no hardware writes.
 Start-Process .\bin\L14KeyboardLight.exe -ArgumentList '--self-test', 'self-test.txt' -Wait
 Get-Content .\self-test.txt
 
@@ -121,10 +124,10 @@ When sharing a status report, review its machine and foreground-window details f
 
 ## Validation
 
-- All **67 simulated tests** passed: 20 policy tests, 30 geometry tests and 17 localization tests covering language selection, translations and settings compatibility.
+- All **102 automated tests** passed: 20 existing policy tests, 19 display-off policy tests, 16 power-notification tests, 30 geometry tests and 17 localization tests.
 - On one L14 Gen 3 Intel 21C2, all three physical brightness levels were read and set successfully.
 - A visible test window verified fullscreen Off, restoration on return to windowed mode, repeated entry, manual override, exclusion of ordinary maximization and restoration on clean exit.
-- Actual sleep, lock and display-off cycles, exclusive fullscreen games and multiple physical monitors remain unverified locally.
+- Exclusive fullscreen games and multiple physical monitors remain unverified locally. Power-event validation details and the distinction between injected notifications and physical power cycles are recorded in [VALIDATION.md](VALIDATION.md).
 
 See [VALIDATION.md](VALIDATION.md) for the original Hungarian validation record and [CHANGELOG.md](CHANGELOG.md) for changes.
 

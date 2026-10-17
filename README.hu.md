@@ -1,6 +1,6 @@
 # L14 Keyboard Light
 
-Kis Windows-tálcaprogram, amely az előtérben lévő teljes képernyős ablaknál lekapcsolja a ThinkPad billentyűzetvilágítását, majd visszaállítja a korábbi fényerőt.
+Kis Windows-tálcaprogram, amely kikapcsolt kijelzőnél és az előtérben lévő teljes képernyős ablaknál lekapcsolja a ThinkPad billentyűzetvilágítását, majd visszaállítja a korábbi fényerőt.
 
 **Támogatott típus: ThinkPad L14 Gen 3 Intel, 21C2 géptípus, világítós billentyűzettel és a Lenovo meglévő energiagazdálkodási driverével.** A program más géptípuson vagy ismeretlen driverválasznál leáll. Egy ilyen laptopon, Windows 11 alatt próbáltuk ki.
 
@@ -66,15 +66,17 @@ A program az óra melletti tálcaikonok között fut. Ha rejtett, a felfelé mut
 | Magyar menüpont | Angol menüpont | Művelet |
 | --- | --- | --- |
 | **Ki / Halvány / Erős** | **Off / Low / High** | Fényerő beállítása és megjegyzése. |
-| **Teljes képernyőn automatikusan kikapcsol** | **Turn off automatically in fullscreen** | Teljes képernyőn lekapcsolja a fényt, majd visszaállítja a korábbi fokozatot. A jelölés kikapcsolása szünetelteti az automatikus vezérlést. |
+| **Teljes képernyőn automatikusan kikapcsol** | **Turn off automatically in fullscreen** | Teljes képernyőn lekapcsolja a fényt, majd visszaállítja a korábbi fokozatot. A jelölés kikapcsolása csak a teljes képernyős vezérlést szünetelteti. |
 | **Indítás a Windowszal** | **Start with Windows** | Automatikus indulás a saját Windows-fiókodban. |
 | **Nyelv → English / Magyar** | **Language → English / Magyar** | Azonnali nyelvváltás, a választás megjegyzésével. |
 | **Állapot…** | **Status…** | A géptípus, a működés és az utolsó hiba megjelenítése. Dupla kattintással is megnyitható. |
-| **Kilépés** | **Exit** | Leállítja a programot, és visszaállítja az általa automatikusan lekapcsolt fényt, ha közben nem történt kézi módosítás. |
+| **Kilépés** | **Exit** | Leállítja a programot. Bekapcsolt kijelzőnél és aktív munkamenetben visszaállítja az általa lekapcsolt fényt, ha közben nem történt kézi módosítás. |
 
 Az **Fn+Space továbbra is működik**. Ha teljes képernyő közben kézzel visszakapcsolod a fényt, a program az adott teljes képernyős alkalom végéig elfogadja a választásodat. Új teljes képernyős alkalommal ismét automatikusan lekapcsol. A tálcamenüben választott fokozat is kézi felülbírálásnak számít.
 
-Az automatikus vezérlés szüneteltetése és a szabályos kilépés visszaállítja a program által lekapcsolt fényt, de nem írja felül az időközben kézzel választott fényerőt.
+A teljes képernyős vezérlés szüneteltetése és a szabályos kilépés bekapcsolt kijelzőnél, aktív munkamenetben visszaállítja a program által lekapcsolt fényt, de nem írja felül az időközben kézzel választott fényerőt.
+
+A kijelző kikapcsolásakor történő lekapcsolás mindig működik, a teljes képernyős kapcsolótól és a teljes képernyő közbeni kézi felülbírálástól függetlenül. A Windows kijelzőkikapcsolási értesítésére a program azonnal lekapcsolja a billentyűzetfényt, zárolt munkamenetben is. Amíg a Windows engedi futni, körülbelül két másodpercenként ismét ellenőrzi. A kijelző fényerejének csökkentése önmagában nem kapcsolja le a billentyűzetfényt. A korábbi fényerőt akkor állítja vissza, amikor a kijelző és a munkamenet is aktív, és a teljes képernyős vezérlés nem indokolja a lekapcsolva tartást. Kikapcsolt kijelzőnél a szüneteltetés és a kilépés sem kapcsolja vissza a fényt.
 
 ## A teljes képernyő felismerése és korlátai
 
@@ -82,7 +84,7 @@ Az előtérben lévő ablakot a hozzá tartozó monitor teljes méretével hason
 
 A felismerés az **ablak méretét** figyeli, nem a videó lejátszását. A szüneteltetett teljes képernyős videót is teljes képernyőnek tekinti. Egy kézzel pontosan monitor méretűre húzott, keret nélküli ablak is annak számíthat. Több fizikai monitorral és exkluzív teljes képernyős játékkal nem történt helyi próba.
 
-Amíg a Windows inaktívnak jelzi a munkamenetet, a program nem menti a firmware által lekapcsolt fényt új választásként. Visszatéréskor rövid várakozás után újraértékeli a teljes képernyős állapotot, és szükség szerint visszaállítja a megjegyzett fokozatot. A tényleges zárolást, kijelzőkikapcsolást és alvást nem idéztük elő a helyi próba során; ezek állapotkezelését szimulált tesztek ellenőrzik.
+Amíg a Windows inaktívnak jelzi a munkamenetet, a program nem menti a firmware által lekapcsolt fényt új választásként. Visszatéréskor körülbelül 1,4 másodperc várakozás után újraértékeli a teljes képernyős állapotot, és szükség szerint visszaállítja a megjegyzett fokozatot. A kijelző visszakapcsolásának értesítése önmagában nem kapcsolja vissza a billentyűzetfényt, ha a munkamenet továbbra is zárolt vagy felfüggesztett. Az értesítések feldolgozását és ezeket az állapotváltásokat automatizált tesztek ellenőrzik.
 
 ## Beállítások és diagnosztika
 
@@ -93,7 +95,7 @@ A választott nyelv `en` vagy `hu` értékként kerül a `settings.json` fájlba
 Ezek a parancsok nem indítanak második tálcavezérlőt:
 
 ```powershell
-# Állapotgép-, geometriai és nyelvi regressziós tesztek; hardverírás nélkül.
+# Mind a 102 állapotgép-, kijelző-, energiaértesítési, geometriai és nyelvi teszt; hardverírás nélkül.
 Start-Process .\bin\L14KeyboardLight.exe -ArgumentList '--self-test', 'self-test.txt' -Wait
 Get-Content .\self-test.txt
 
@@ -108,10 +110,10 @@ Start-Process .\bin\L14KeyboardLight.exe -ArgumentList '--status', 'status.txt' 
 
 ## Ellenőrzés
 
-- Mind a **67 szimulált teszt** sikeres: 20 állapotgép-, 30 geometriai és 17 nyelvi teszt. Utóbbiak a nyelvválasztást, a fordításokat és a korábbi beállítások kompatibilitását ellenőrzik.
+- Mind a **102 automatizált teszt** sikeres: 20 korábbi állapotgép-, 19 kijelzőkikapcsolási, 16 energiaértesítési, 30 geometriai és 17 nyelvi teszt.
 - Egy L14 Gen 3 Intel 21C2 laptopon mindhárom tényleges fényerő kiolvasása és beállítása sikeres volt.
 - Látható saját tesztablakkal sikeresen ellenőriztük a teljes képernyős lekapcsolást, az ablakos módra váltáskor történő visszaállítást, az ismételt belépést, a kézi felülbírálást, a normál maximalizálás kizárását és a szabályos kilépéskor történő visszaállítást.
-- A tényleges alvás, zárolás és kijelzőkikapcsolás, az exkluzív teljes képernyős játékok és a több fizikai monitoros működés helyileg még nem volt kipróbálva.
+- Az exkluzív teljes képernyős játékok és a több fizikai monitoros működés helyileg még nem volt kipróbálva. Az energiaesemények ellenőrzését, a beadott értesítések és a tényleges hardveres ciklusok megkülönböztetésével, a [VALIDATION.md](VALIDATION.md) részletezi.
 
 A részletes eredeti feljegyzés a [VALIDATION.md](VALIDATION.md), a változások listája a [CHANGELOG.md](CHANGELOG.md) fájlban található.
 

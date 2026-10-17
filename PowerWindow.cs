@@ -14,6 +14,7 @@ namespace L14KeyboardLight
         public bool Suspended;
         public bool DisplayOn = true;
         public event EventHandler Resuming;
+        public event EventHandler DisplayStateChanged;
         public event EventHandler SessionEnding;
 
         public PowerWindow()
@@ -23,7 +24,7 @@ namespace L14KeyboardLight
             Text = "L14 Keyboard Light power listener";
             IntPtr window = Handle; // A hidden top-level HWND receives broadcast power messages.
             sessionRegistered = WTSRegisterSessionNotification(window, 0);
-            Guid display = new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5");
+            Guid display = DisplayNotification.SessionDisplayStatus;
             notification = RegisterPowerSettingNotification(window, ref display, 0);
             if (!sessionRegistered || notification == IntPtr.Zero)
                 throw UiText.WithMessage(new InvalidOperationException(UiText.Get("ErrorPowerEvents")), "ErrorPowerEvents");
@@ -32,6 +33,11 @@ namespace L14KeyboardLight
         public bool IsActive
         {
             get { return !Locked && !Disconnected && !Suspended && DisplayOn && IsDefaultInputDesktop(); }
+        }
+
+        public bool CanControlBacklight
+        {
+            get { return !Suspended && !Disconnected; }
         }
 
         private void OnResuming()
@@ -58,13 +64,18 @@ namespace L14KeyboardLight
                     Suspended = false;
                     OnResuming();
                 }
-                else if (reason == 0x8013 && message.LParam != IntPtr.Zero)
+                else if (reason == 0x8013)
                 {
-                    Guid setting = (Guid)Marshal.PtrToStructure(message.LParam, typeof(Guid));
-                    if (setting == new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5") && Marshal.ReadInt32(message.LParam, 16) >= 4)
+                    bool displayOn;
+                    if (DisplayNotification.TryRead(message.LParam, out displayOn))
                     {
                         bool wasOn = DisplayOn;
-                        DisplayOn = Marshal.ReadInt32(message.LParam, 20) != 0;
+                        DisplayOn = displayOn;
+                        if (DisplayOn != wasOn)
+                        {
+                            EventHandler changed = DisplayStateChanged;
+                            if (changed != null) changed(this, EventArgs.Empty);
+                        }
                         if (DisplayOn && !wasOn) OnResuming();
                     }
                 }
