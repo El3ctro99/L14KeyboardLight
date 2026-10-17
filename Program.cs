@@ -11,8 +11,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("L14 Keyboard Light")]
 [assembly: AssemblyDescription("Lenovo OEM driver keyboard backlight control for ThinkPad L14 Gen 3 21C2")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace L14KeyboardLight
 {
@@ -27,6 +27,8 @@ namespace L14KeyboardLight
             Application.SetCompatibleTextRenderingDefault(false);
             try
             {
+                // Load language before hardware checks so startup errors follow the saved choice.
+                UiText.SetLanguage(Settings.Load(2).Language);
                 if (args.Length > 0 && args[0] == "--stop")
                 {
                     try { using (EventWaitHandle stop = EventWaitHandle.OpenExisting(StopEvent)) stop.Set(); }
@@ -39,8 +41,10 @@ namespace L14KeyboardLight
                     {
                         int policy = PolicyTests.Run(output);
                         int fullscreen = FullscreenTests.Run(output);
-                        output.WriteLine("OVERALL: " + (policy == 0 && fullscreen == 0 ? "PASS" : "FAIL"));
-                        return policy == 0 && fullscreen == 0 ? 0 : 1;
+                        int localization = LocalizationTests.Run(output);
+                        bool passed = policy == 0 && fullscreen == 0 && localization == 0;
+                        output.WriteLine("OVERALL: " + (passed ? "PASS" : "FAIL"));
+                        return passed ? 0 : 1;
                     }
                 }
                 if (args.Length == 2 && args[0] == "--status")
@@ -71,7 +75,7 @@ namespace L14KeyboardLight
                 {
                     try { File.WriteAllText(args[1], "ERROR: " + error.ToString(), Encoding.UTF8); } catch { }
                 }
-                else MessageBox.Show(error.Message, "L14 Keyboard Light", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                else MessageBox.Show(UiText.ErrorMessage(error), "L14 Keyboard Light", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }
         }
@@ -92,12 +96,18 @@ namespace L14KeyboardLight
         private readonly ToolStripMenuItem[] levels = new ToolStripMenuItem[3];
         private readonly ToolStripMenuItem automatic;
         private readonly ToolStripMenuItem startup;
+        private readonly ToolStripMenuItem status;
+        private readonly ToolStripMenuItem exit;
+        private readonly ToolStripMenuItem language;
+        private readonly ToolStripMenuItem english;
+        private readonly ToolStripMenuItem hungarian;
         private readonly System.Windows.Forms.Timer timer;
         private bool wasActive;
         private bool resumePending;
         private DateTime settleUntil = DateTime.MinValue;
         private DateTime retryAfter = DateTime.MinValue;
-        private string lastError;
+        private Exception lastError;
+        private string lastShownError;
         private string lastState;
         private bool exiting;
 
@@ -108,6 +118,7 @@ namespace L14KeyboardLight
             int initial = device.ReadLevel();
             resumePending = File.Exists(Settings.FilePath);
             settings = Settings.Load(initial);
+            UiText.SetLanguage(settings.Language);
             // Save the initial level too, so a restart during suppression can restore it.
             settings.Save();
             policy = new BacklightPolicy(device, settings.PreferredLevel, settings.AutoEnabled, delegate(int level)
@@ -124,16 +135,15 @@ namespace L14KeyboardLight
             title.Enabled = false;
             menu.Items.Add(title);
             menu.Items.Add(new ToolStripSeparator());
-            string[] names = { "Ki", "Halvány", "Erős" };
             for (int index = 0; index < 3; index++)
             {
                 int chosen = index;
-                levels[index] = new ToolStripMenuItem(names[index]);
+                levels[index] = new ToolStripMenuItem();
                 levels[index].Click += delegate { Act(delegate { policy.ChooseLevel(chosen); }); };
                 menu.Items.Add(levels[index]);
             }
             menu.Items.Add(new ToolStripSeparator());
-            automatic = new ToolStripMenuItem("Teljes képernyőn automatikusan kikapcsol");
+            automatic = new ToolStripMenuItem();
             automatic.Click += delegate
             {
                 Act(delegate
@@ -144,24 +154,35 @@ namespace L14KeyboardLight
                 });
             };
             menu.Items.Add(automatic);
-            startup = new ToolStripMenuItem("Indítás a Windowszal");
+            startup = new ToolStripMenuItem();
             startup.Click += delegate { Act(delegate { SetStartup(!HasStartup()); }); };
             menu.Items.Add(startup);
-            ToolStripMenuItem status = new ToolStripMenuItem("Állapot…");
+            language = new ToolStripMenuItem();
+            english = new ToolStripMenuItem("English");
+            hungarian = new ToolStripMenuItem("Magyar");
+            english.Click += delegate { SelectLanguage("en"); };
+            hungarian.Click += delegate { SelectLanguage("hu"); };
+            language.DropDownItems.Add(english);
+            language.DropDownItems.Add(hungarian);
+            menu.Items.Add(language);
+            status = new ToolStripMenuItem();
             status.Click += delegate
             {
-                string text = "Gép: " + device.Family + " (" + device.Model + ")\r\n" +
-                    "Kívánt fényerő: " + names[policy.PreferredLevel] + "\r\n" +
-                    "Teljes képernyő: " + (policy.IsFullscreen ? "igen" : "nem") + "\r\n" +
-                    "Automatikusan lekapcsolva: " + (policy.IsSuppressed ? "igen" : "nem") + "\r\n" +
-                    "Kézi felülbírálás: " + (policy.ManualOverride ? "igen" : "nem") + "\r\n" +
-                    "Automatikus indulás: " + (HasStartup() ? "be" : "ki") + "\r\n" +
-                    (lastError == null ? "Állapot: rendben" : "Utolsó hiba: " + lastError);
+                string text = String.Join("\r\n", new string[]
+                {
+                    UiText.Format("StatusMachine", device.Family, device.Model),
+                    UiText.Format("StatusPreferred", UiText.LevelName(policy.PreferredLevel)),
+                    UiText.Format("StatusFullscreen", UiText.YesNo(policy.IsFullscreen)),
+                    UiText.Format("StatusSuppressed", UiText.YesNo(policy.IsSuppressed)),
+                    UiText.Format("StatusManualOverride", UiText.YesNo(policy.ManualOverride)),
+                    UiText.Format("StatusStartup", UiText.OnOff(HasStartup())),
+                    lastError == null ? UiText.Get("StatusOk") : UiText.Format("StatusLastError", UiText.ErrorMessage(lastError))
+                });
                 MessageBox.Show(text, "L14 Keyboard Light", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
             menu.Items.Add(status);
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem exit = new ToolStripMenuItem("Kilépés");
+            exit = new ToolStripMenuItem();
             exit.Click += delegate { ExitThread(); };
             menu.Items.Add(exit);
             menu.Opening += delegate { UpdateMenu(); };
@@ -172,7 +193,7 @@ namespace L14KeyboardLight
             timer.Tick += Tick;
             timer.Start();
             Application.ApplicationExit += ApplicationExiting;
-            Settings.Log("Started 1.0.0; model=" + device.Model + "; initial=" + initial + "; preferred=" + policy.PreferredLevel);
+            Settings.Log("Started 1.1.0; model=" + device.Model + "; initial=" + initial + "; preferred=" + policy.PreferredLevel + "; language=" + UiText.Language);
             UpdateMenu();
         }
 
@@ -193,10 +214,11 @@ namespace L14KeyboardLight
                 policy.Poll(FullscreenDetector.IsForegroundFullscreen(), true, resumePending);
                 resumePending = false;
                 lastError = null;
+                lastShownError = null;
                 string state = "fullscreen=" + policy.IsFullscreen + "; suppressed=" + policy.IsSuppressed +
                     "; override=" + policy.ManualOverride + "; preferred=" + policy.PreferredLevel;
                 if (state != lastState) { Settings.Log(state); lastState = state; }
-                tray.Text = policy.IsSuppressed ? "L14 Keyboard Light – teljes képernyő: Ki" : "L14 Keyboard Light";
+                UpdateTooltip();
             }
             catch (Exception error) { ReportError(error); }
         }
@@ -208,6 +230,7 @@ namespace L14KeyboardLight
                 if (!power.IsActive) return;
                 action();
                 lastError = null;
+                lastShownError = null;
                 retryAfter = DateTime.MinValue;
                 UpdateMenu();
             }
@@ -217,20 +240,60 @@ namespace L14KeyboardLight
         private void ReportError(Exception error)
         {
             retryAfter = DateTime.UtcNow.AddSeconds(5);
-            if (error.Message != lastError)
+            string message = UiText.ErrorMessage(error);
+            if (message != lastShownError)
             {
                 Settings.Log(error.ToString());
-                tray.ShowBalloonTip(7000, "L14 Keyboard Light", error.Message, ToolTipIcon.Warning);
+                tray.ShowBalloonTip(7000, "L14 Keyboard Light", message, ToolTipIcon.Warning);
             }
-            lastError = error.Message;
-            tray.Text = "L14 Keyboard Light – vezérlési hiba";
+            lastError = error;
+            lastShownError = message;
+            UpdateTooltip();
         }
 
         private void UpdateMenu()
         {
-            for (int index = 0; index < levels.Length; index++) levels[index].Checked = policy.PreferredLevel == index;
+            for (int index = 0; index < levels.Length; index++)
+            {
+                levels[index].Text = UiText.LevelName(index);
+                levels[index].Checked = policy.PreferredLevel == index;
+            }
+            automatic.Text = UiText.Get("AutoFullscreen");
             automatic.Checked = policy.AutoEnabled;
+            startup.Text = UiText.Get("Startup");
             startup.Checked = HasStartup();
+            language.Text = UiText.Get("LanguageMenu");
+            english.Text = UiText.Get("English");
+            hungarian.Text = UiText.Get("Hungarian");
+            english.Checked = UiText.Language == "en";
+            hungarian.Checked = UiText.Language == "hu";
+            status.Text = UiText.Get("StatusMenu");
+            exit.Text = UiText.Get("Exit");
+            UpdateTooltip();
+        }
+
+        private void ChangeLanguage(string selected)
+        {
+            if (settings.Language == selected) return;
+            string previous = settings.Language;
+            settings.Language = selected;
+            try { settings.Save(); }
+            catch { settings.Language = previous; throw; }
+            UiText.SetLanguage(selected);
+            UpdateMenu();
+        }
+
+        private void SelectLanguage(string selected)
+        {
+            // Choosing a language neither calls the policy nor clears a cached device error.
+            try { ChangeLanguage(selected); }
+            catch (Exception error) { ReportError(error); }
+        }
+
+        private void UpdateTooltip()
+        {
+            tray.Text = lastError != null ? UiText.Get("TooltipError") :
+                (policy.IsSuppressed ? UiText.Get("TooltipSuppressed") : "L14 Keyboard Light");
         }
 
         private static bool HasStartup()

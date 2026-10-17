@@ -6,6 +6,8 @@ Kis Windows-tálcaprogram, amely az előtérben lévő teljes képernyős ablakn
 
 [English documentation](README.md)
 
+A menü, az állapotablak, az ikon súgószövege és a program saját üzenetei **magyarul és angolul** is elérhetők. Első indításkor magyar Windows-megjelenítési nyelvnél magyarul, egyébként angolul indul. A tálcamenü **Nyelv → English / Magyar** pontjával azonnal válthatsz; a választást a következő indításra is megjegyzi.
+
 ## Követelmények és működés
 
 - Windows 11 x64 és ThinkPad L14 Gen 3 Intel **21C2**.
@@ -61,11 +63,14 @@ A `-RestorePrevious` kapcsolóval a korábban átállított vezérlő indulási 
 
 A program az óra melletti tálcaikonok között fut. Ha rejtett, a felfelé mutató nyíllal találod meg. Jobb kattintás az ikonon:
 
-- **Ki / Halvány / Erős:** fényerő beállítása és megjegyzése.
-- **Teljes képernyőn automatikusan kikapcsol:** az előtérben lévő teljes képernyős alkalmazásnál lekapcsolja a billentyűzet fényét, kilépéskor visszaállítja a korábbi fokozatot. A jelölés kikapcsolásával szüneteltethető az automatikus vezérlés.
-- **Indítás a Windowszal:** automatikus indulás a saját Windows-fiókodban.
-- **Állapot…:** a géptípus, a működés és az utolsó hiba megjelenítése. Dupla kattintással is megnyitható.
-- **Kilépés:** leállítja a programot, és visszaállítja az általa automatikusan lekapcsolt fényt, ha közben nem történt kézi módosítás.
+| Magyar menüpont | Angol menüpont | Művelet |
+| --- | --- | --- |
+| **Ki / Halvány / Erős** | **Off / Low / High** | Fényerő beállítása és megjegyzése. |
+| **Teljes képernyőn automatikusan kikapcsol** | **Turn off automatically in fullscreen** | Teljes képernyőn lekapcsolja a fényt, majd visszaállítja a korábbi fokozatot. A jelölés kikapcsolása szünetelteti az automatikus vezérlést. |
+| **Indítás a Windowszal** | **Start with Windows** | Automatikus indulás a saját Windows-fiókodban. |
+| **Nyelv → English / Magyar** | **Language → English / Magyar** | Azonnali nyelvváltás, a választás megjegyzésével. |
+| **Állapot…** | **Status…** | A géptípus, a működés és az utolsó hiba megjelenítése. Dupla kattintással is megnyitható. |
+| **Kilépés** | **Exit** | Leállítja a programot, és visszaállítja az általa automatikusan lekapcsolt fényt, ha közben nem történt kézi módosítás. |
 
 Az **Fn+Space továbbra is működik**. Ha teljes képernyő közben kézzel visszakapcsolod a fényt, a program az adott teljes képernyős alkalom végéig elfogadja a választásodat. Új teljes képernyős alkalommal ismét automatikusan lekapcsol. A tálcamenüben választott fokozat is kézi felülbírálásnak számít.
 
@@ -83,10 +88,12 @@ Amíg a Windows inaktívnak jelzi a munkamenetet, a program nem menti a firmware
 
 A beállítások és a diagnosztikai naplók helye: `%LOCALAPPDATA%\L14KeyboardLight`. A napló körülbelül 256 KB-nál fordul, és egy korábbi fájlt tart meg.
 
+A választott nyelv `en` vagy `hu` értékként kerül a `settings.json` fájlba. Az 1.0.0-s beállítások betöltésekor a program hozzáadja az alapértelmezett nyelvet, a mentett fényerő és az automatikus vezérlés beállításának módosítása nélkül. A nyelvváltás nem változtatja meg a billentyűzet fényerejét.
+
 Ezek a parancsok nem indítanak második tálcavezérlőt:
 
 ```powershell
-# 20 állapotgép- és 30 geometriai teszt; hardverírás nélkül.
+# Állapotgép-, geometriai és nyelvi regressziós tesztek; hardverírás nélkül.
 Start-Process .\bin\L14KeyboardLight.exe -ArgumentList '--self-test', 'self-test.txt' -Wait
 Get-Content .\self-test.txt
 
@@ -101,7 +108,7 @@ Start-Process .\bin\L14KeyboardLight.exe -ArgumentList '--status', 'status.txt' 
 
 ## Ellenőrzés
 
-- Mind az **50 szimulált teszt** sikeres: 20 állapotgép- és 30 geometriai teszt.
+- Mind a **67 szimulált teszt** sikeres: 20 állapotgép-, 30 geometriai és 17 nyelvi teszt. Utóbbiak a nyelvválasztást, a fordításokat és a korábbi beállítások kompatibilitását ellenőrzik.
 - Egy L14 Gen 3 Intel 21C2 laptopon mindhárom tényleges fényerő kiolvasása és beállítása sikeres volt.
 - Látható saját tesztablakkal sikeresen ellenőriztük a teljes képernyős lekapcsolást, az ablakos módra váltáskor történő visszaállítást, az ismételt belépést, a kézi felülbírálást, a normál maximalizálás kizárását és a szabályos kilépéskor történő visszaállítást.
 - A tényleges alvás, zárolás és kijelzőkikapcsolás, az exkluzív teljes képernyős játékok és a több fizikai monitoros működés helyileg még nem volt kipróbálva.

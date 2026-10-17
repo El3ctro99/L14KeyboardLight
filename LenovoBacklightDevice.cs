@@ -19,14 +19,14 @@ namespace L14KeyboardLight
         {
             using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS"))
             {
-                if (key == null) throw new InvalidOperationException("Nem olvasható a gép típusa.");
+                if (key == null) throw UiText.WithMessage(new InvalidOperationException(UiText.Get("ErrorModelRead")), "ErrorModelRead");
                 Model = Convert.ToString(key.GetValue("SystemProductName"));
                 Family = Convert.ToString(key.GetValue("SystemFamily"));
                 string maker = Convert.ToString(key.GetValue("SystemManufacturer"));
                 if (!maker.Equals("LENOVO", StringComparison.OrdinalIgnoreCase) ||
                     !Model.StartsWith("21C2", StringComparison.OrdinalIgnoreCase) ||
                     Family.IndexOf("ThinkPad L14 Gen 3", StringComparison.OrdinalIgnoreCase) < 0)
-                    throw new NotSupportedException("Ez a kiadás csak az ellenőrzött ThinkPad L14 Gen 3 (21C2) típushoz készült.");
+                    throw UiText.WithMessage(new NotSupportedException(UiText.Get("ErrorUnsupportedModel")), "ErrorUnsupportedModel");
             }
         }
 
@@ -38,7 +38,7 @@ namespace L14KeyboardLight
             {
                 int error = Marshal.GetLastWin32Error();
                 handle.Dispose();
-                throw new Win32Exception(error, "Nem érhető el a Lenovo energiagazdálkodási drivere (IBMPmDrv).");
+                throw UiText.WithMessage(new Win32Exception(error, UiText.Get("ErrorDriverOpen")), "ErrorDriverOpen");
             }
             return handle;
         }
@@ -50,11 +50,11 @@ namespace L14KeyboardLight
                 byte[] output = new byte[16];
                 uint count;
                 if (!DeviceIoControl(handle, GetIoctl, null, 0, output, (uint)output.Length, out count, IntPtr.Zero))
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Nem sikerült kiolvasni a billentyűzet fényerejét.");
-                if (count < 4) throw new InvalidOperationException("A Lenovo-driver hiányos választ adott.");
+                    throw UiText.WithMessage(new Win32Exception(Marshal.GetLastWin32Error(), UiText.Get("ErrorDriverRead")), "ErrorDriverRead");
+                if (count < 4) throw UiText.WithMessage(new InvalidOperationException(UiText.Get("ErrorDriverShortResponse")), "ErrorDriverShortResponse");
                 uint value = BitConverter.ToUInt32(output, 0);
                 if (value < 0x00250200 || value > 0x00250202)
-                    throw new NotSupportedException("Ismeretlen Lenovo-válasz: 0x" + value.ToString("X8") + ". A vezérlés leállt.");
+                    throw UiText.WithMessage(new NotSupportedException(UiText.Format("ErrorDriverUnknownResponse", value.ToString("X8"))), "ErrorDriverUnknownResponse", value.ToString("X8"));
                 return (int)(value - 0x00250200);
             }
         }
@@ -68,7 +68,7 @@ namespace L14KeyboardLight
                 byte[] output = new byte[16];
                 uint count;
                 if (!DeviceIoControl(handle, SetIoctl, input, (uint)input.Length, output, (uint)output.Length, out count, IntPtr.Zero))
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Nem sikerült beállítani a billentyűzet fényerejét.");
+                    throw UiText.WithMessage(new Win32Exception(Marshal.GetLastWin32Error(), UiText.Get("ErrorDriverWrite")), "ErrorDriverWrite");
             }
         }
 

@@ -10,3 +10,7 @@ Környezet: ThinkPad L14 Gen 3 Intel (21C2), Windows 11 build 26300, beépített
 - Végállapot: program normál felhasználóként fut, HKCU automatikus indulás beállítva; korábbi BacklightResetService leállítva és letiltva, előző indítási beállításai mentve.
 
 A Windows tényleges zárolását, kijelzőkikapcsolását, alvását és leállítását nem idéztük elő a felhasználó munkája közben; az ezekhez tartozó állapotkezelést szimulált tesztek ellenőrizték. Több fizikai monitorral és exkluzív teljes képernyős játékkal nem történt helyi próba.
+
+## 1.1.0 – angol és magyar felület
+
+2026. október 17.: a figyelmeztetéseket hibaként kezelő C# 5 fordítás sikeres. Mind a 67 automatizált teszt sikeres: az eredeti 20 állapotgép- és 30 geometriai teszt mellett 17 nyelvi ellenőrzés. Utóbbiak ellenőrzik a Windows-nyelv szerinti alapértéket, a kifejezett választás elsőbbségét, a régi JSON-beállítások változatlan fényerővel történő migrációját, a mentett angol nyelv visszaolvasását, a teljes fordításkészletet, a tooltip hosszát és a nyelvváltás után újrafordítható driverhibákat. A nyelvváltás nem hívja meg a fényerőszabályzatot.

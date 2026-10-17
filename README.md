@@ -9,6 +9,7 @@ A small Windows tray app that turns off a ThinkPad's keyboard backlight while th
 ## Features
 
 - Off, Low and High brightness from the tray menu.
+- English and Hungarian menus, status dialogs, tooltips and app messages, with live language switching.
 - Automatic fullscreen suppression and restoration of the previous level.
 - Manual overrides with **Fn+Space** or the tray menu. An override lasts for the current fullscreen session.
 - Optional startup with the current Windows account.
@@ -17,7 +18,7 @@ A small Windows tray app that turns off a ThinkPad's keyboard backlight while th
 
 The app uses the **already installed Lenovo `IBMPmDrv` driver**. It does not install a kernel driver or include WinRing0, TVicPort or PawnIO. Lenovo Vantage and a separate .NET Desktop Runtime are not required. The app runs as a normal user.
 
-The tray menu and runtime messages are currently in Hungarian.
+On first run, the app uses Hungarian when the Windows display language is Hungarian, and English otherwise. Choose **Language → English / Magyar** from the tray menu to change it immediately. The choice is saved for the next launch.
 
 ## Requirements
 
@@ -77,13 +78,14 @@ To also restore a previously migrated controller, add `-RestorePrevious`. Restor
 
 Right-click the keyboard icon near the clock. It may be in the hidden-icons area.
 
-| Hungarian menu item | Action |
-| --- | --- |
-| **Ki / Halvány / Erős** | Set and remember Off / Low / High. |
-| **Teljes képernyőn automatikusan kikapcsol** | Enable or pause automatic fullscreen suppression. |
-| **Indítás a Windowszal** | Enable or disable startup for your Windows account. |
-| **Állapot…** | Show the model, current policy state and last error. Double-clicking the icon also opens this dialog. |
-| **Kilépés** | Exit and restore brightness if this app still owns the automatic suppression. |
+| English menu item | Hungarian menu item | Action |
+| --- | --- | --- |
+| **Off / Low / High** | **Ki / Halvány / Erős** | Set and remember the brightness. |
+| **Turn off automatically in fullscreen** | **Teljes képernyőn automatikusan kikapcsol** | Enable or pause automatic fullscreen suppression. |
+| **Start with Windows** | **Indítás a Windowszal** | Enable or disable startup for your Windows account. |
+| **Language → English / Magyar** | **Nyelv → English / Magyar** | Change the interface language immediately and remember it for the next launch. |
+| **Status…** | **Állapot…** | Show the model, current policy state and last error. Double-clicking the icon also opens this dialog. |
+| **Exit** | **Kilépés** | Exit and restore brightness if this app still owns the automatic suppression. |
 
 Turning off automation or exiting restores a light the app suppressed, without overwriting a manual brightness change. A new fullscreen session enables suppression again after a manual override.
 
@@ -99,10 +101,12 @@ While Windows reports the session inactive, the app avoids treating a firmware-i
 
 Settings and rolling diagnostic logs are stored in `%LOCALAPPDATA%\L14KeyboardLight`. The log rotates at approximately 256 KB and retains one previous file.
 
+The saved language is `en` or `hu` in `settings.json`. Existing 1.0.0 settings receive a language default without changing the saved brightness or automatic-fullscreen preference. Switching language does not change the keyboard brightness.
+
 The following commands do not start a second tray controller:
 
 ```powershell
-# Run 20 policy tests and 30 fullscreen-geometry tests; no hardware writes.
+# Run 20 policy, 30 fullscreen-geometry and 17 localization tests; no hardware writes.
 Start-Process .\bin\L14KeyboardLight.exe -ArgumentList '--self-test', 'self-test.txt' -Wait
 Get-Content .\self-test.txt
 
@@ -117,7 +121,7 @@ When sharing a status report, review its machine and foreground-window details f
 
 ## Validation
 
-- All **50 simulated tests** passed: 20 policy tests and 30 geometry tests.
+- All **67 simulated tests** passed: 20 policy tests, 30 geometry tests and 17 localization tests covering language selection, translations and settings compatibility.
 - On one L14 Gen 3 Intel 21C2, all three physical brightness levels were read and set successfully.
 - A visible test window verified fullscreen Off, restoration on return to windowed mode, repeated entry, manual override, exclusion of ordinary maximization and restoration on clean exit.
 - Actual sleep, lock and display-off cycles, exclusive fullscreen games and multiple physical monitors remain unverified locally.

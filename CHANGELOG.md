@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 — 2026-10-17
+
+- Add English and Hungarian tray menus, status dialogs, tooltips and app messages.
+- Add a **Language / Nyelv → English / Magyar** submenu for immediate switching without changing keyboard brightness.
+- Choose Hungarian on first run when the Windows display language is Hungarian, and English otherwise; remember an explicit language choice across launches.
+- Load 1.0.0 settings without changing the existing brightness or automatic-fullscreen preference.
+- Add localization regression tests alongside the existing 20 policy tests and 30 fullscreen-geometry tests.
+- Update the English and Hungarian documentation with both sets of menu labels.
+
 ## 1.0.0 — 2026-10-17
 
 Initial release for ThinkPad L14 Gen 3 Intel, machine type 21C2, on Windows 11 x64.

@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -10,6 +11,7 @@ namespace L14KeyboardLight
     {
         [DataMember] public int PreferredLevel = 2;
         [DataMember] public bool AutoEnabled = true;
+        [DataMember] public string Language;
         public static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "L14KeyboardLight");
         public static readonly string FilePath = Path.Combine(Folder, "settings.json");
         public static readonly string LogPath = Path.Combine(Folder, "diagnostics.log");
@@ -23,12 +25,23 @@ namespace L14KeyboardLight
                     using (FileStream stream = File.OpenRead(FilePath))
                     {
                         Settings settings = (Settings)new DataContractJsonSerializer(typeof(Settings)).ReadObject(stream);
-                        if (settings != null && settings.PreferredLevel >= 0 && settings.PreferredLevel <= 2) return settings;
+                        if (settings != null && settings.PreferredLevel >= 0 && settings.PreferredLevel <= 2)
+                        {
+                            settings.NormalizeLanguage(CultureInfo.CurrentUICulture);
+                            return settings;
+                        }
                     }
                 }
-                catch (Exception error) { Log("Beállítások olvasása: " + error.Message); }
+                catch (Exception error) { Log(UiText.Format("LogSettingsRead", error.Message)); }
             }
-            return new Settings { PreferredLevel = initialLevel };
+            Settings fresh = new Settings { PreferredLevel = initialLevel };
+            fresh.NormalizeLanguage(CultureInfo.CurrentUICulture);
+            return fresh;
+        }
+
+        public void NormalizeLanguage(CultureInfo culture)
+        {
+            Language = UiText.ResolveLanguage(Language, culture);
         }
 
         public void Save()

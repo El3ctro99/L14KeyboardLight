@@ -26,7 +26,7 @@ namespace L14KeyboardLight
             Guid display = new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5");
             notification = RegisterPowerSettingNotification(window, ref display, 0);
             if (!sessionRegistered || notification == IntPtr.Zero)
-                throw new InvalidOperationException("Nem sikerült feliratkozni a Windows munkamenet- és kijelzőeseményeire.");
+                throw UiText.WithMessage(new InvalidOperationException(UiText.Get("ErrorPowerEvents")), "ErrorPowerEvents");
         }
 
         public bool IsActive
